@@ -1,0 +1,31 @@
+Here is my API key for the windyAPI: bdxrgB12mGM7QvhqSUBRGtN2fBGTlo8M
+
+I plan on beginning and getting started with the windy api and then seeing if im missing anything before collecting more data.
+
+First stages, get access to windy data, figure out how to get it into my R to begin analysing it
+
+I have the endpoint: POST https://api.windy.com/api/point-forecast/v2
+with 
+{
+    "lat": 49.809,
+    "lon": 16.787,
+    "model": "desired_model",
+    "parameters": ["desired_parameter_1", "desired_parameter_2", ...],
+    "levels": ["optionally_desired_gh_level_1", ...],
+    "key": "your_API_key"
+}
+
+for ex.
+
+{
+    "lat": 49.809,
+    "lon": 16.787,
+    "model": "gfs",
+    "parameters": ["wind", "dewpoint", "rh", "pressure"],
+    "levels": ["surface", "800h", "300h"],
+    "key": "windyisthebest"
+}
+
+So there I have latitude longitude coordinates. Then the parameters I want, the model I want, and the levels. Ill be using "Surface" because I care mainly about what it feels like. 
+
+What latitude and longitude do I actually want, is setting any point in Dunedin okay.

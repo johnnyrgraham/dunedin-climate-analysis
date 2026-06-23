@@ -1,0 +1,157 @@
+---
+title: "Dunedin Weather — Data Preparation"
+author: "Johnny Graham"
+date: "`r Sys.Date()`"
+output:
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+**Introduction**
+
+This project was undertaken to answer a practical question posed by a family member: what is the weather like in Dunedin, on average? They want a single printed page to be kept at the front door with Dunedin weather analysis — a seasonal reference that allows a person leaving the house to quickly form expectations about temperature, wind, and rainfall without consulting a daily forecast. I have decided to do thorough analysis and create visualisations to display dunedin weather on average with enough specificity month by month, and times of day to inform decisions before leaving the house.
+The design principle guiding this project is coverage over specificity. Rather than precise hourly predictions, the visualisations aim to represent typical conditions across seasons and months, from which a viewer can make practical inferences — whether to bring a rain jacket, a windbreaker, or neither. The most useful information the poster communicates is the expected temperature and wind direction and speed for the season or month, and even whether there are hour by hour differences in seasons a person finds themselves in.
+Historical data was chosen over point forecast data deliberately. A weather forecast describes what is predicted to happen on a specific future date. Historical climate data describes what has actually happened over many years — it is a more honest answer to the question "what is Dunedin weather like" than any single forecast could be.
+Beyond its practical purpose, this project serves as a portfolio piece demonstrating applied data science skills including data acquisition, preparation, exploratory analysis, modelling and machine learning, and communication. The analysis is conducted in R and documented in R Markdown to ensure full reproducibility.
+
+This data preparation stage was completed with the assistance of an AI language model (Claude, Anthropic). Data processing and pipeline construction are areas the author is actively developing, and AI was used as a learning tool to understand and implement the steps involved in reading, cleaning, joining, and saving a multi-file dataset in R. The AI assisted with diagnosing errors, correcting code, and structuring the R Markdown document, while explanations of each step were requested and reviewed to build understanding rather than simply copying solutions. All analytical decisions — including the choice of data source, variables, time range, and the decision to defer the 10-year trimming to the EDA stage — were made by the author. The exploratory and analytical stages of this project are conducted independently, reflecting the author's existing competence in applied statistical analysis. Prompts and responses from the planning and preparation stages are retained as a supplementary record of how the project was framed and how decisions evolved.
+
+
+**Data Description**
+
+Data were obtained from NIWA's DataHub (data.niwa.co.nz), New Zealand's national climate database. All data come from the Dunedin Musselburgh EWS station (agent no. 15752), an automatic weather station located at 170.5057°E, 45.8335°S in the Musselburgh area of Dunedin, near the harbour. The station record spans 8 August 1997 to 17 June 2026. Two stations exist at Musselburgh — the traditional NIWA climate station and the Musselburgh EWS. The EWS was selected for its consistent automated hourly recording across all variables of interest.
+Seven variables were downloaded as separate CSV files, each containing hourly observations: mean temperature (°C), maximum and minimum temperature (°C), grass temperature (°C), relative humidity (%), wind speed (m/s) and direction (degrees true), gust speed (m/s) and direction (degrees true), rainfall (mm), atmospheric pressure (hPa), sunshine hours, and global horizontal radiation(MJ/$m^2$). All variables are recorded at hourly resolution with a 1-hour preceding period. Pressure data begins 20 days after the temperature record (1997-08-28 versus 1997-08-08), sunshine data begins on 12 April 2002, and radiation data ends in March 2026 rather than June 2026, reflecting different sensor installation and decommission dates. Prior to filtering, the full dataset comprises 252,519 hourly observations.
+The seven files were joined into a single dataset on the UTC datetime column, then filtered to begin in 12 April 2002 to ensure all variables are present across a consistent time window. Timestamps were converted from UTC to New Zealand time. The final prepared dataset spans 12 April 2002 to June 2026. A decision on whether to further restrict the analysis to the most recent 10 years (2016–2026) has been deferred to the EDA stage, where a distributional comparison between earlier and later periods will be performed to assess whether recent climate conditions differ meaningfully from the earlier record.
+```{r message=FALSE, warning=FALSE}
+# --- Load libraries ---
+
+library(tidyverse)
+library(lubridate)
+library(janitor)
+
+# --- Read and clean each file ---
+
+temperature <- read_csv("Data/Raw/Temperature__hourly.csv") %>%
+  clean_names() %>%
+  select(
+    datetime_utc = observation_time_utc,
+    temp_mean    = mean_temperature_deg_c,
+    temp_max     = maximum_temperature_deg_c,
+    temp_min     = minimum_temperature_deg_c,
+    temp_grass   = grass_temperature_deg_c,
+    humidity     = mean_relative_humidity_percent
+  )
+
+wind <- read_csv("Data/Raw/Wind__hourly.csv") %>%
+  clean_names() %>%
+  select(
+    datetime_utc   = observation_time_utc,
+    wind_direction = direction_deg_t,
+    wind_speed     = speed_m_s
+  )
+
+gust <- read_csv("Data/Raw/Gust__hourly.csv") %>%
+  clean_names() %>%
+  select(
+    datetime_utc   = observation_time_utc,
+    gust_direction = direction_deg_t,
+    gust_speed     = speed_m_s
+  )
+
+rain <- read_csv("Data/Raw/Rain__hourly.csv") %>%
+  clean_names() %>%
+  select(
+    datetime_utc = observation_time_utc,
+    rainfall_mm  = rainfall_mm
+  )
+
+pressure <- read_csv("Data/Raw/Pressure__hourly.csv") %>%
+  clean_names() %>%
+  select(
+    datetime_utc = observation_time_utc,
+    pressure_msl = mean_sea_level_pressure_hpa,
+    pressure_stn = station_level_pressure
+  )
+
+sunshine <- read_csv("Data/Raw/Sunshine__hourly.csv") %>%
+  clean_names() %>%
+  select(
+    datetime_utc = observation_time_utc,
+    sunshine_hrs = sunshine_hrs
+  )
+radiation <- read_csv("Data/Raw/Radiation__Global__hourly.csv") %>%
+  clean_names() %>%
+  select(
+    datetime_utc = observation_time_utc,
+    radiation_mj = radiation_mj_m2
+  )
+```
+
+
+Before joining, each file was checked for duplicate timestamps using count(). No duplicates were found in any file, confirming that each dataset has a unique observation per hour. The files were then joined using a left join on datetime_utc, with temperature as the base file."
+
+```{r}
+# --- Join all files on datetime ---
+
+weather <- temperature %>%
+  left_join(wind,     by = "datetime_utc") %>%
+  left_join(gust,     by = "datetime_utc") %>%
+  left_join(rain,     by = "datetime_utc") %>%
+  left_join(pressure, by = "datetime_utc") %>%
+  left_join(sunshine, by = "datetime_utc") %>%
+  left_join(radiation, by = "datetime_utc")
+
+# --- Check the join result ---
+
+nrow(weather)
+glimpse(weather)
+
+weather %>%
+  arrange(desc(datetime_utc)) %>%
+  select(datetime_utc, radiation_mj) %>%
+  head(20)
+```
+Three sources of NA were identified and confirmed as genuine data absence rather than processing errors: pressure data begins 20 days after the temperature record, sunshine data begins on 12 April 2002, and radiation data ends in March 2026, reflecting different sensor installation and decommission dates. A manual spot-check confirmed that pressure joins correctly for dates where both files overlap.
+
+```{r}
+# --- Filter to April 2002 ---
+
+weather <- weather %>%
+  filter(datetime_utc >= as.POSIXct("2002-04-12 01:00:00", tz = "UTC"))
+
+nrow(weather)
+```
+
+The dataset was filtered to begin on 12 April 2002, the date from which sunshine data becomes available, ensuring all seven variables are present across a consistent time window. The filtered dataset contains 211616 hourly observations spanning April 2002 to June 2026. A decision on whether to further restrict the analysis to the most recent 10 years (2016–2026) has been deferred to the EDA stage, where a distributional comparison between earlier and later periods will be performed to assess whether recent climate conditions differ meaningfully from the earlier record.
+
+```{r}
+# --- Convert UTC to NZ time and derive time columns ---
+
+weather <- weather %>%
+  mutate(
+    datetime_nzt = with_tz(datetime_utc, tzone = "Pacific/Auckland"),
+    year   = year(datetime_nzt),
+    month  = month(datetime_nzt, label = TRUE),
+    hour   = hour(datetime_nzt),
+    season = case_when(
+      month(datetime_nzt) %in% c(12, 1, 2) ~ "Summer",
+      month(datetime_nzt) %in% c(3, 4, 5)  ~ "Autumn",
+      month(datetime_nzt) %in% c(6, 7, 8)  ~ "Winter",
+      month(datetime_nzt) %in% c(9, 10, 11) ~ "Spring"
+    )
+  )
+```
+
+Timestamps were converted from UTC to New Zealand time using with_tz(). Season assignments follow the Southern Hemisphere calendar — summer spans December through February, autumn March through May, winter June through August, and spring September through November.
+
+```{r}
+# --- Save clean dataset ---
+
+dir.create("Data/Clean", showWarnings = FALSE)
+saveRDS(weather, "Data/Clean/dunedin_weather_clean.rds")
+```
+
+The clean dataset has been saved to Data/Clean/dunedin_weather_clean.rds and will be loaded at the start of the EDA document. Raw files remain unmodified.
